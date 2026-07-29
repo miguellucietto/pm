@@ -25,8 +25,6 @@ all-run: all run
 
 dirs:
 	@mkdir -p $(BIN_DIR) $(BUILD_DIR) $(SRC_DIR) $(INCLUDE_DIR)
-	@mv $(wildcard *.c) $(SRC_DIR)/
-	@mv $(wildcard *.h) $(INCLUDE_DIR)/
 
 run:
 	@./$(BIN_DIR)/all
@@ -53,7 +51,6 @@ info:
 
 clean:
 	@rm -rf $(BIN_DIR) $(BUILD_DIR)
-
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
