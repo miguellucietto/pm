@@ -2,3 +2,6 @@ build/
 bin/
 *.o
 *.d
+compile_commands.json
+.clangd
+TODO

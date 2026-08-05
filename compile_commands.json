@@ -1,0 +1,42 @@
+[
+  {
+    "file": "src/init.c",
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-std=c17",
+      "-ggdb",
+      "-Iinclude",
+      "-MMD",
+      "-MP",
+      "-c",
+      "src/init.c",
+      "-o",
+      "build/init.o"
+    ],
+    "directory": "/home/miguel/.code/c/projects/pm",
+    "output": "build/init.o"
+  },
+  {
+    "file": "src/main.c",
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-std=c17",
+      "-ggdb",
+      "-Iinclude",
+      "-MMD",
+      "-MP",
+      "-c",
+      "src/main.c",
+      "-o",
+      "build/main.o"
+    ],
+    "directory": "/home/miguel/.code/c/projects/pm",
+    "output": "build/main.o"
+  }
+]

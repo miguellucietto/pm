@@ -1,0 +1,15 @@
+pm init <OPTIONAL name>:
+    if not name, create the structure in the current directory, else, creates the directory with the project structure
+
+
+pm add <name>:
+    creates include/name.h and src/name.c
+
+
+pm remove <name>:
+    remove the project
+
+
+pm run <OPTIONAL name>:
+    if not name, try to run whatever is in the binary dir, if not binary dir, error message, run the project with this <name>
+
