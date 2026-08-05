@@ -1,4 +1,6 @@
-#ifndef // FILE_NAME_H
-#define // FILE_NAME_H
+#ifndef REMOVE_H
+#define REMOVE_H
+
+void pm_remove(const char* file);
 
 #endif

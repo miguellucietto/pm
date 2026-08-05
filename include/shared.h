@@ -4,6 +4,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+#define CMDF(format, ...)                                                      \
+  do {                                                                         \
+    char command_buffer[1024];                                     \
+    snprintf(command_buffer, 1024, format, ##__VA_ARGS__);         \
+    system(command_buffer);                                                    \
+  } while (0)
+
+
 static const char *DEFAULT_MAIN_C =
 "#include <stdio.h>\n"
 "\n"

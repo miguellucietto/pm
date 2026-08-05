@@ -73,9 +73,9 @@ int pm_init(const char *root) {
       return -1;                                                               \
   } while (0)
 
-
-  FILE *f = fopen(".pm", "w");
-  fprintf(f, "pm\n\n\nThis file is necessary to recognize this directory as a pm directory\nPlease do not remove it from your project\notherwise, some commands may not work");
+  snprintf(path, sizeof(path), "%s/.pm", root);
+  FILE *f = fopen(path, "w");
+  fputs("This file is necessary for some pm commands, pls, keep it here", f);
   fclose(f);
 
   Mkdir("src");

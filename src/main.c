@@ -4,6 +4,7 @@
 #include <string.h>
 #include "init.h"
 #include "add.h"
+#include "remove.h"
 
 #define UNIMPLEMENTED\
   printf("Function %d wasn't implemented yet\n", __LINE__)
@@ -28,7 +29,8 @@ int main(int argc, char **argv) {
       pm_add(argv[i]);
     return 0;
   } else if (IS(command, "rm")) {
-    UNIMPLEMENTED;
+    for (int i = 2; i < argc; i++)
+      pm_remove(argv[i]);
     return 0;
   }
   else {
