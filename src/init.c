@@ -73,10 +73,14 @@ int pm_init(const char *root) {
       return -1;                                                               \
   } while (0)
 
-  
+
+  FILE *f = fopen(".pm", "w");
+  fprintf(f, "pm\n\n\nThis file is necessary to recognize this directory as a pm directory\nPlease do not remove it from your project\notherwise, some commands may not work");
+  fclose(f);
+
   Mkdir("src");
   Mkdir("include");
   Mkdir("build");
-
+  
   return write_default_files(root);
 }

@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "ini.h"
+#include "init.h"
+#include "add.h"
 
 #define UNIMPLEMENTED\
-  printf("Function %s wasn't implemented yet\n", __func__)
+  printf("Function %d wasn't implemented yet\n", __LINE__)
 
 int main(int argc, char **argv) {
 
@@ -23,9 +24,14 @@ int main(int argc, char **argv) {
       pm_init(argv[i]);
     return 0;
   } else if (IS(command, "add")) {
+    for (int i = 2; i < argc; i++)
+      pm_add(argv[i]);
+    return 0;
+  } else if (IS(command, "rm")) {
     UNIMPLEMENTED;
     return 0;
-  } else {
+  }
+  else {
     printf("Command '%s' not found", argv[1]);
     return 0;
   }
