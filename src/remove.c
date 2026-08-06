@@ -4,15 +4,17 @@
 #include "remove.h"
 #include "shared.h"
 
-void pm_remove(const char *file) {
-  if (!file) {
-    return;
+
+
+int remove_file(const char* file) {
+if (!file) {
+    return EXIT_FAILURE;
   }
 
   FILE *f = fopen(".pm", "r");
   if (!f) {
     printf("[INFO] Cannot delete files outside of pm project yet");
-    return;
+    return EXIT_FAILURE;
   }
 
   size_t s = strlen(file) + 100;
@@ -23,4 +25,18 @@ void pm_remove(const char *file) {
 
   CMDF("rm -rf %s", fh);
   CMDF("rm -rf %s", fc);
+
+  return EXIT_SUCCESS;
+}
+
+
+
+int pm_remove(int argc, char** argv) {
+  (void) DEFAULT_CLANGD;
+  (void) DEFAULT_MAKEFILE;
+  (void) DEFAULT_MAIN_C;
+  for (int i = 0; i < argc; i++) {
+    remove_file(argv[i]);
+  }
+  return EXIT_SUCCESS;
 }

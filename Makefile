@@ -11,21 +11,30 @@ DEPS = $(OBJECTS:.o=.d)
 
 TARGET = pm
 
+
+dev: all
+	@sudo install -Dm755 ./$(TARGET) /usr/local/bin/pm
+
+undev:
+	@sudo rm -f /usr/local/bin/pm
+
+
 all: $(TARGET)
+
 
 $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $@
 
 $(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET) compile_commands.json
+	@rm -rf $(BUILD_DIR) $(TARGET) compile_commands.json
 
 bear:
-	bear -- $(MAKE)
+	@bear -- $(MAKE)
 
 -include $(DEPS)

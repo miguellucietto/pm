@@ -1,6 +1,7 @@
 #ifndef ADD_H
 #define ADD_H
 
-void pm_add(const char* name);
+int pm_add(int argc, char** argv);
+int add_file(const char*);
 
 #endif // ADD_H

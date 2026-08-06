@@ -1,6 +1,7 @@
 #ifndef REMOVE_H
 #define REMOVE_H
 
-void pm_remove(const char* file);
+int remove_file(const char*);
+int pm_remove(int argc, char** argv);
 
 #endif

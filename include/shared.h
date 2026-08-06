@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 
 #define CMDF(format, ...)                                                      \
@@ -57,5 +58,10 @@ static const char *DEFAULT_MAKEFILE =
     "\n"
     ".PHONY: all clean\n";
 
+
+
+// Functions
+bool has_flag(int argc, char** argv, char flag);
+char* get_arg(int argc, char** argv, int i);
 
 #endif

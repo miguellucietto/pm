@@ -1,4 +1,3 @@
-#include "init.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,35 +5,54 @@
 #include "add.h"
 #include "remove.h"
 
-#define UNIMPLEMENTED\
-  printf("Function %d wasn't implemented yet\n", __LINE__)
+typedef int (*CmdHandler)(int argc, char** argv);
+
+typedef struct Command Command;
+typedef struct Command {
+  const char *name;
+  const char *description;
+  const char *usage;
+
+  CmdHandler handler; 
+} Command;
+
+static const Command commands[] = {
+    {"init", "make a directory with a project structure", "pm init <name>", pm_init},
+    {"add", "add .h and .c files in the project", "pm add <name>", pm_add},
+    {"rm", "remove .h and .c files in the project", "pm rm <name>", pm_remove},
+};
+#define CMDC (sizeof(commands) / sizeof(commands[0]))
+
+#define UNIMPLEMENTED							\
+  printf("Function in line %d wasn't implemented yet\n", __LINE__)
+
+
+const Command *find_cmd(char* arg) {
+  if (!arg)
+    return NULL;
+  for (int i = 0; i < (int) CMDC; i++) {
+    if (strcmp(arg, commands[i].name) == 0) return &commands[i];
+  }
+  return NULL;
+}
+
 
 int main(int argc, char **argv) {
-
+  
   if (argc < 2) {
     fprintf(stderr, "A command is necessary to run pm\n");
     return 1;
   }
 
   char *command = argv[1];
-
-#define IS(command, this) (strcmp(command, this) == 0)
-
-  if (IS(command, "init")) {
-    for (int i = 2; i < argc; i++)
-      pm_init(argv[i]);
-    return 0;
-  } else if (IS(command, "add")) {
-    for (int i = 2; i < argc; i++)
-      pm_add(argv[i]);
-    return 0;
-  } else if (IS(command, "rm")) {
-    for (int i = 2; i < argc; i++)
-      pm_remove(argv[i]);
-    return 0;
+  const Command *cmd = find_cmd(command);
+  if (!cmd) {
+    fprintf(
+        stderr,
+        "Command '%s' not found, use the command 'help' to see other options\n",
+        command);
+    return EXIT_FAILURE;
   }
-  else {
-    printf("Command '%s' not found", argv[1]);
-    return 0;
-  }
+
+  return cmd->handler(argc - 2, argv + 2);
 }
