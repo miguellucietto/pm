@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+extern bool Flags[256];
 
 #define CMDF(format, ...)                                                      \
   do {                                                                         \
@@ -61,7 +62,10 @@ static const char *DEFAULT_MAKEFILE =
 
 
 // Functions
-bool has_flag(int argc, char** argv, char flag);
+bool has_flag(char flag);
+bool is_flag(char* command);
+void get_flags(int argc, char **argv);
+void warn_invalid_flags(int flagc, char* flags);
 char* get_arg(int argc, char** argv, int i);
 
 #endif
