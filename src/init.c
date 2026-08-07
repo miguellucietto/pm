@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,6 +7,14 @@
 #include <sys/stat.h>
 #include "init.h"
 #include "shared.h"
+
+
+bool no_bear = false;           // Cancel the compile_commands.json // -b
+bool no_default_files = false; // Cancel the default files         // -d
+bool no_make = false;         // Cancel the Makefile              // -M
+bool no_cland = false;       // Cancel the .clangd               // -c
+bool no_main = false;       // Cancel the main.c                // -m
+
 
 int make_path(char *path, size_t size, const char* r, const char* t) {
   if (!path || !t) {
@@ -89,8 +98,27 @@ char path[1024];
 
 
 int pm_init(int argc, char** argv) {
+  get_flags(argc, argv);
+  if (has_flag('c')) {
+    no_cland = true;
+  }
+  if (has_flag('m')) {
+    no_main = true;
+  }
+  if (has_flag('M')) {
+    no_make = true;
+  }
+  if (has_flag('d')) {
+    no_default_files = true;
+  }
+  if (has_flag('b')) {
+    no_bear = true;
+  }
+  
+
   for (int i = 0; i < argc; i++) {
-    if (init(argv[i]) == EXIT_FAILURE) return EXIT_FAILURE;
+    if (!is_flag(argv[i]) && init(argv[i]) == EXIT_FAILURE)
+      return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 }

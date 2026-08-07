@@ -6,6 +6,8 @@
 
 
 
+
+
 int remove_file(const char* file) {
 if (!file) {
     return EXIT_FAILURE;
@@ -32,11 +34,8 @@ if (!file) {
 
 
 int pm_remove(int argc, char** argv) {
-  (void) DEFAULT_CLANGD;
-  (void) DEFAULT_MAKEFILE;
-  (void) DEFAULT_MAIN_C;
-  for (int i = 0; i < argc; i++) {
-    remove_file(argv[i]);
+  get_flags(argc, argv);
+  if (has_flag('p')) {
+    
   }
-  return EXIT_SUCCESS;
 }
