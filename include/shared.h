@@ -65,7 +65,7 @@ static const char *DEFAULT_MAKEFILE =
 bool has_flag(char flag);
 bool is_flag(char* command);
 void get_flags(int argc, char **argv);
-void warn_invalid_flags(int flagc, char* flags);
+void warn_invalid_flags(int flagc, const char* flags);
 char* get_arg(int argc, char** argv, int i);
 
 #endif

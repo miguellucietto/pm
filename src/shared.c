@@ -45,7 +45,7 @@ void get_flags(int argc, char **argv) {
 
 
 
-void warn_invalid_flags(int flagc, char* rflags) {
+void warn_invalid_flags(int flagc, const char* rflags) {
   char nflags[256];
   int count = 0;
 
