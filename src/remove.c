@@ -5,7 +5,14 @@
 #include "shared.h"
 
 
-
+char* path;
+//\\// ----------------------------------------------------------------//\\//
+bool force = false; // Force the deletion of the files               // -f
+bool pmpath = false; // Accept the path of the pm project           // -p
+bool verbose = false; // Print the process                         // -v
+bool noc = false; // Don't remove the source file                 // -c
+bool noh = false; // Don't remove the header file                // -h
+//\\// ----------------------------------------------------------------//\\//
 
 
 int remove_file(const char* file) {
@@ -35,7 +42,31 @@ if (!file) {
 
 int pm_remove(int argc, char** argv) {
   get_flags(argc, argv);
+  if (has_flag('c')) {
+    noc = true;
+  }
+  if (has_flag('h')) {
+    noh = true;
+  }
+  if (has_flag('f')) {
+    force = true;
+  }
   if (has_flag('p')) {
-    
+    pmpath = true;
+  }
+  if (has_flag('v')) {
+    verbose = true;
+  }
+
+  const char *flags = "chfpv";
+  warn_invalid_flags(strlen(flags), flags);
+
+  for (int i = 0; i < argc; i++) {
+    if (pmpath) {
+      if (i == argc - 1) {
+	continue;
+      }
+    }
+    remove_file((const char*) argv[i]);
   }
 }
