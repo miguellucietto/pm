@@ -10,13 +10,13 @@
 
 
 
-char *path;
+static char *path;
 //\\// ----------------------------------------------------------------//\\//
-bool pmpath = false; // Accept the path of the pm project // -p
-bool verbose = false; // Print the process               // -v
-bool force = false;   // Add file anywhere              // -f
-bool noc = false; // No .c file                        // -h
-bool noh = false; // No .h file                       // -c
+static bool pmpath = false; // Accept the path of the pm project // -p
+static bool verbose = false; // Print the process               // -v
+static bool force = false;   // Add file anywhere              // -f
+static bool noc = false; // No .c file                        // -h
+static bool noh = false; // No .h file                       // -c
 //\\// ----------------------------------------------------------------//\\//
 
 int add_file(const char *name) {

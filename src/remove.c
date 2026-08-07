@@ -5,13 +5,13 @@
 #include "shared.h"
 
 
-char* path;
+static char* path;
 //\\// ----------------------------------------------------------------//\\//
-bool force = false; // Force the deletion of the files               // -f
-bool pmpath = false; // Accept the path of the pm project           // -p
-bool verbose = false; // Print the process                         // -v
-bool noc = false; // Don't remove the source file                 // -c
-bool noh = false; // Don't remove the header file                // -h
+static bool force = false; // Force the deletion of the files               // -f
+static bool pmpath = false; // Accept the path of the pm project           // -p
+static bool verbose = false; // Print the process                         // -v
+static bool noc = false; // Don't remove the source file                 // -c
+static bool noh = false; // Don't remove the header file                // -h
 //\\// ----------------------------------------------------------------//\\//
 
 
