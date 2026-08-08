@@ -91,13 +91,11 @@ int write_default_files(const char* r) {
 }
 
 
-int init(char* root){
-  char p[1024];
-  if (root) strcat(path, root);
-  else
-    root = ".";
-
-  root = path;
+int init(char* r){
+  char p[1024], *root;
+  if (r) {
+    snprintf(root, 1024, "%s/%s", path, r);
+  } else return EXIT_FAILURE;
   
   // Creating directory
  if (verbose) puts("Creating directory...");
@@ -108,7 +106,7 @@ int init(char* root){
 
 #define Mkdir(dir)                                                             \
   do {                                                                         \
-    make_path(p, sizeof(path), root, dir);                                  \
+    make_path(p, sizeof(p), root, dir);                                  \
     if (mkdir(p, 0777) && errno != EEXIST)                                  \
       return EXIT_FAILURE;                                                               \
   } while (0)

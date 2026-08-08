@@ -6,7 +6,19 @@
 #include "shared.h"
 
 
+char *strdup(const char* text) {
+  if (!text)
+    return NULL;
 
+  int len = strlen(text) + 1;
+  char *copy = malloc(len);
+  if (!copy)
+    return NULL;
+
+  memcpy(copy, text, len);
+  copy[len] = '\0';
+  return copy;
+}
 
 
 
