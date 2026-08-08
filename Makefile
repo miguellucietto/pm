@@ -19,7 +19,7 @@ undev:
 	@sudo rm -f /usr/local/bin/pm
 
 
-all: $(TARGET)
+all: $(TARGET) 
 
 
 $(TARGET): $(OBJECTS)

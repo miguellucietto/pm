@@ -8,8 +8,6 @@
 #include "shared.h"
 
 
-
-
 static char *path;
 //\\// ----------------------------------------------------------------//\\//
 static bool pmpath = false; // Accept the path of the pm project // -p
@@ -130,7 +128,11 @@ int pm_add(int argc, char **argv) {
   }
 
   for (int i = 0; i < argc; i++) {
-    if (i == argc - 1) continue;
+    if (verbose) printf("argv[%d] = %s\n", i, argv[i]);
+    
+    if (pmpath && i == argc - 1)
+      continue;
+    
     if (!is_flag(argv[i]) && add_file(argv[i]) == EXIT_FAILURE) {
       return EXIT_FAILURE;
     }

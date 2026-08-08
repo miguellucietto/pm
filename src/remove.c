@@ -103,12 +103,10 @@ int pm_remove(int argc, char** argv) {
   warn_invalid_flags(strlen(flags), flags);
 
   for (int i = 0; i < argc; i++) {
-    if (pmpath) {
-      if (i == argc - 1) {
+    if (pmpath && i == argc - 1) 
 	continue;
-      }
-    }
-    if (remove_file((const char *)argv[i]) == EXIT_FAILURE) {
+      
+    if (!is_flag(argv[i]) && remove_file((const char *)argv[i]) == EXIT_FAILURE) {
       return EXIT_FAILURE;
     }
   }
