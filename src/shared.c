@@ -3,47 +3,100 @@
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
+#include <log.h>
+
 #include "shared.h"
 
+/* Default files are defined once here and exposed read-only through shared.h. */
+const char DEFAULT_MAIN_C[] =
+    "#include <stdio.h>\n"
+    "\n"
+    "int main(void)\n"
+    "{\n"
+    "    return 0;\n"
+    "}\n";
 
+const char DEFAULT_CLANGD[] =
+    "CompileFlags:\n"
+    "  Add:\n"
+    "    - -Wall\n"
+    "    - -Wextra\n"
+    "    - -Wpedantic\n"
+    "    - -std=c17\n"
+    "    - -ggdb\n"
+    "    - -Iinclude\n";
+
+const char DEFAULT_MAKEFILE[] =
+    "CC = gcc\n"
+    "\n"
+    "CFLAGS = -Wall -Wextra -Wpedantic -std=c17 -ggdb -Iinclude -MMD -MP\n"
+    "TARGET ?= a\n"
+    "\n"
+    "CFILES = $(wildcard src/*.c)\n"
+    "OBJECTS = $(patsubst src/%.c,build/%.o,$(CFILES))\n"
+    "DEPS = $(OBJECTS:.o=.d)\n"
+    "\n"
+    "all: $(TARGET)\n"
+    "\n"
+    "$(TARGET): $(OBJECTS)\n"
+    "\t$(CC) $(OBJECTS) -o $@\n"
+    "\n"
+    "build/%.o: src/%.c\n"
+    "\t@mkdir -p build\n"
+    "\t$(CC) $(CFLAGS) -c $< -o $@\n"
+    "\n"
+    "-include $(DEPS)\n"
+    "\n"
+    "clean:\n"
+    "\trm -rf build $(TARGET)\n"
+    "\n"
+    ".PHONY: all clean\n";
+
+
+/* Allocate an independent copy of text. The caller owns the returned memory. */
 char *strdup(const char* text) {
   if (!text)
     return NULL;
 
-  int len = strlen(text) + 1;
+  size_t len = strlen(text) + 1;
   char *copy = malloc(len);
   if (!copy)
     return NULL;
 
   memcpy(copy, text, len);
-  copy[len] = '\0';
   return copy;
 }
 
 
 
+/* Return an argument by index, or NULL when the index is outside argv. */
 char *get_arg(int argc, char** argv, int i) {
-  if (argc < i || i < 0)
+  if (!argv || i < 0 || i >= argc)
     return NULL;
 
   return argv[i];
 }
 
 
-// Flags
+/* One entry for every possible unsigned-char flag name. */
 bool Flags[256] = {false};
 
+/* A pm option always starts with '-'. */
 bool is_flag(char* command) {
-  if (command[0] == '-')
-    return true;
+  return command && command[0] == '-';
 }
 
+/* Query a flag previously collected by get_flags(). */
 bool has_flag(char flag) {
   return Flags[(unsigned char) flag];
 }
 
 
-void get_flags(int argc, char **argv) { 
+/* Collect grouped flags, so -vf is equivalent to -v -f. */
+void get_flags(int argc, char **argv) {
+  if (!argv) {
+    PANIC("No argument or flag detected");
+  }
   memset(Flags, 0, sizeof(Flags));
 
  for (int i = 0; i < argc; ++i) {
@@ -57,6 +110,7 @@ void get_flags(int argc, char **argv) {
 
 
 
+/* Log flags that are not present in the command's allowlist. */
 void warn_invalid_flags(int flagc, const char* rflags) {
   char nflags[256];
   int count = 0;
@@ -78,6 +132,6 @@ void warn_invalid_flags(int flagc, const char* rflags) {
   }
   nflags[count] = '\0';
   if (count > 0) {
-    fprintf(stderr, "Unrecognized flags '%s'\n", nflags);
+    WARN("Unrecognized flags '%s'", nflags);
   }
 }

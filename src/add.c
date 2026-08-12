@@ -4,11 +4,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <log.h>
+
 #include "add.h"
 #include "shared.h"
 
 
 static char *path;
+/* Flags accepted by `pm add`. */
 //\\// ----------------------------------------------------------------//\\//
 static bool pmpath = false; // Accept the path of the pm project // -p
 static bool verbose = false; // Print the process               // -v
@@ -17,9 +20,10 @@ static bool noc = false; // No .c file                        // -h
 static bool noh = false; // No .h file                       // -c
 //\\// ----------------------------------------------------------------//\\//
 
+/* Create the source/header pair requested by the active flags. */
 int add_file(const char *name) {
   if (!name) {
-    fprintf(stderr, "Provide a name to add\n%s", __func__);
+    ERROR("Provide a name to add");
     return EXIT_FAILURE;
   }
 
@@ -33,13 +37,13 @@ int add_file(const char *name) {
       snprintf(opath, sizeof(opath), "%s/.pm", path);
       f = fopen(opath, "r");
       if (!f) {
-	printf("The path '%s' is not a pm project\n", path);
+	ERROR("The path '%s' is not a pm project", path);
 	return EXIT_FAILURE;
       }
     } else {
       f = fopen(".pm", "r");
       if (!f) {
-	printf("The command has to be used in a pm project\n");
+	ERROR("The command has to be used in a pm project");
 	return EXIT_FAILURE;
       }
     }
@@ -78,7 +82,7 @@ int add_file(const char *name) {
 	fprintf(f, "#include \"%s\"", fileh);
 	fclose(f);
       } else {
-	fprintf(stderr, "Could not create %s\n", filec);
+	ERROR("Could not create '%s'", filec);
       }
     }
 
@@ -86,10 +90,10 @@ int add_file(const char *name) {
     if (!noh) { 
       f = fopen(fileh, "w");
       if (f) {
-	fputs("#ifndef\n#define\n\n#endif", f);
+	fprintf(f, "#ifndef %s_H_\n#define %s_H_\n\n#endif /* %s_H_ */ \n", name, name, name);
 	fclose(f);
       } else {
-	fprintf(stderr, "Could not create %s\n", fileh);
+	ERROR("Could not create '%s'", fileh);
       }
     }
     
@@ -98,7 +102,7 @@ int add_file(const char *name) {
 }
 
 
-// Verify flags and execute the function
+/* Parse `pm add` flags and create every non-flag file name. */
 int pm_add(int argc, char **argv) {
   get_flags(argc, argv);
   if (has_flag('p')) {

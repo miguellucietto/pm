@@ -5,11 +5,14 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <log.h>
+
 #include "init.h"
 #include "shared.h"
 
 static char* path;
 
+/* Flags accepted by `pm init`. */
 static bool pmpath = false; // Accept the path of the directory to create the project  -p | path
 static bool no_default_files = false; // Cancel the default files                      -d | default files
 static bool no_make = false; // Cancel the Makefile                                    -M | Makefile
@@ -18,9 +21,10 @@ static bool no_main = false; // Cancel the main.c                               
 static bool verbose = false; // Print the process                                      -v | verbose
 
 
+/* Join a project root and a relative path into the caller's buffer. */
 int make_path(char *p, size_t size, const char* r, const char* t) {
   if (!p || !t) {
-    fprintf(stderr, "Could not resolve path (%s)", __func__);
+    ERROR("Could not resolve path");
     return EXIT_FAILURE;
   }
   
@@ -37,13 +41,14 @@ int make_path(char *p, size_t size, const char* r, const char* t) {
   return EXIT_SUCCESS;
 }
 
+/* Create or replace a text file with the provided default content. */
 int write_file(const char* p, const char* content) {
   if (!content) {
-    fprintf(stderr, "Provide a content to write in the file: %s (%s)\n", p, __func__);
+    ERROR("No content was provided for file '%s'", p ? p : "(null)");
     return EXIT_FAILURE;
   }
   if (!p) {
-    fprintf(stderr, "Provide a path to write the content (%s)\n", __func__);
+    ERROR("No path was provided for the file");
     return EXIT_FAILURE;
   }
 
@@ -52,7 +57,7 @@ int write_file(const char* p, const char* content) {
   
   FILE *f = fopen(p, "w");
   if (!f) {
-    fprintf(stderr, "Could not open file: %s (%s)\n", p, __func__);
+    ERROR("Could not open file '%s': %s", p, strerror(errno));
     return EXIT_FAILURE;
   }
 
@@ -67,6 +72,7 @@ int write_file(const char* p, const char* content) {
 }
 
 
+/* Write every enabled file from the project template. */
 int write_default_files(const char* r) {
   const char* root = r ? r : ".";
 
@@ -91,16 +97,20 @@ int write_default_files(const char* r) {
 }
 
 
+/* Create the directories, marker and templates for one pm project. */
 int init(char* r){
-  char p[1024], *root;
+  char p[1024], root[1024];
   if (r) {
-    snprintf(root, 1024, "%s/%s", path, r);
+    if (snprintf(root, sizeof(root), "%s/%s", path, r) >= (int)sizeof(root)) {
+      ERROR("Project path is too long");
+      return EXIT_FAILURE;
+    }
   } else return EXIT_FAILURE;
   
   // Creating directory
  if (verbose) puts("Creating directory...");
-  if (root && mkdir(root, 0777) && errno != EEXIST) {
-    fprintf(stderr, "Could not resolve root (%s)", __func__);
+  if (mkdir(root, 0777) && errno != EEXIST) {
+    ERROR("Could not create project root '%s': %s", root, strerror(errno));
       return EXIT_FAILURE;
   }
 
@@ -114,9 +124,16 @@ int init(char* r){
   // Making .pm path
   if (verbose) puts("Creating .pm...");
   
-  snprintf(p, sizeof(p), "%s/.pm", root);
+  if (snprintf(p, sizeof(p), "%s/.pm", root) >= (int)sizeof(p)) {
+    ERROR("Project marker path is too long");
+    return EXIT_FAILURE;
+  }
   FILE *f = fopen(p, "w");
-  fputs("This file is necessary for some pm commands, pls, keep it here", f);
+  if (!f) {
+    ERROR("Could not create project marker '%s': %s", p, strerror(errno));
+    return EXIT_FAILURE;
+  }
+  fprintf(f, "%s\nThis file is necessary for some pm commands, pls, keep it here", root);
   fclose(f);
 
 
@@ -130,6 +147,7 @@ int init(char* r){
 }
 
 
+/* Parse `pm init` arguments and initialize every supplied project name. */
 int pm_init(int argc, char** argv) {
   get_flags(argc, argv);
   if (has_flag('c')) {

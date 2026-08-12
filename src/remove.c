@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <log.h>
+
 #include "remove.h"
 #include "shared.h"
 
 
 static char* path;
+/* Flags accepted by `pm rm`. */
 //\\// ----------------------------------------------------------------//\\//
 static bool force = false; // Force the deletion of the files               // -f
 static bool pmpath = false; // Accept the path of the pm project           // -p
@@ -15,8 +18,10 @@ static bool noh = false; // Don't remove the header file                // -h
 //\\// ----------------------------------------------------------------//\\//
 
 
+/* Remove the source/header pair requested by the active flags. */
 int remove_file(const char* file) {
-if (!file) {
+  if (!file) {
+    ERROR("Provide a name to remove");
     return EXIT_FAILURE;
   }
 
@@ -29,13 +34,13 @@ if (!file) {
 
     f = fopen(opath, "r");
     if (!f) {
-      fprintf(stderr, "The path '%s' is not a pm project\n", path);
+      ERROR("The path '%s' is not a pm project", path);
       return EXIT_FAILURE;
     }
   } else {
     f = fopen(".pm", "r");
     if (!f) {
-      fprintf(stderr, "The command needs a pm project\n");
+      ERROR("The command needs a pm project");
       return EXIT_FAILURE;
     }
   }
@@ -80,6 +85,7 @@ if (!file) {
 }
 
 
+/* Parse `pm rm` flags and remove every non-flag file name. */
 int pm_remove(int argc, char** argv) {
   get_flags(argc, argv);
   if (has_flag('c')) {

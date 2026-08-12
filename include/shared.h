@@ -7,6 +7,12 @@
 
 extern bool Flags[256];
 
+/*
+ * Execute a formatted shell command.
+ *
+ * Prefer CMD from log.h for new code: it avoids the shell, reports the exit
+ * status and produces a structured command log. CMDF remains for legacy code.
+ */
 #define CMDF(format, ...)                                                      \
   do {                                                                         \
     char command_buffer[1024];                                     \
@@ -15,58 +21,29 @@ extern bool Flags[256];
   } while (0)
 
 
-static const char *DEFAULT_MAIN_C =
-"#include <stdio.h>\n"
-"\n"
-"int main(void)\n"
-"{\n"
-"    return 0;\n"
-"}\n";
-
-static const char *DEFAULT_CLANGD =
-"CompileFlags:\n"
-"  Add:\n"
-"    - -Wall\n"
-"    - -Wextra\n"
-"    - -Wpedantic\n"
-"    - -std=c17\n"
-"    - -ggdb\n"
-"    - -Iinclude\n";
-
-static const char *DEFAULT_MAKEFILE =
-    "CC = gcc\n"
-    "\n"
-    "CFLAGS = -Wall -Wextra -Wpedantic -std=c17 -ggdb -Iinclude -MMD -MP\n"
-    "TARGET ?= a\n"
-    "\n"
-    "CFILES = $(wildcard src/*.c)\n"
-    "OBJECTS = $(patsubst src/%.c,build/%.o,$(CFILES))\n"
-    "DEPS = $(OBJECTS:.o=.d)\n"
-    "\n"
-    "all: $(TARGET)\n"
-    "\n"
-    "$(TARGET): $(OBJECTS)\n"
-    "\t$(CC) $(OBJECTS) -o $@\n"
-    "\n"
-    "build/%.o: src/%.c\n"
-    "\t@mkdir -p build\n"
-    "\t$(CC) $(CFLAGS) -c $< -o $@\n"
-    "\n"
-    "-include $(DEPS)\n"
-    "\n"
-    "clean:\n"
-    "\trm -rf build $(TARGET)\n"
-    "\n"
-    ".PHONY: all clean\n";
+/* Contents installed by `pm init` when the matching files are enabled. */
+extern const char DEFAULT_MAIN_C[];
+extern const char DEFAULT_CLANGD[];
+extern const char DEFAULT_MAKEFILE[];
 
 
 
-// Functions
+/* Return whether a flag was collected by the latest get_flags() call. */
 bool has_flag(char flag);
+
+/* Return whether command has the syntactic form of an option. */
 bool is_flag(char* command);
+
+/* Reset the global flag table and collect every character after '-'. */
 void get_flags(int argc, char **argv);
+
+/* Log flags that are absent from the supplied list of allowed characters. */
 void warn_invalid_flags(int flagc, const char* flags);
+
+/* Safely retrieve argv[i]; returns NULL when i is outside the argument list. */
 char *get_arg(int argc, char **argv, int i);
+
+/* Allocate a copy of text; the caller must release it with free(). */
 char* strdup(const char*);
 
 #endif
