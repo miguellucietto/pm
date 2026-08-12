@@ -5,222 +5,171 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <log.h>
 
 #include "build.h"
 #include "run.h"
 #include "shared.h"
 
-/*
- * Run flags:
- *
- *   -p <path>  use a project outside the current directory
- *   -b         build the project before running it
- *   -v         print extra information (and verbose build output)
- *   -a         everything after this flag is passed to the executable
- *
- * The executable name is optional. Without it, pm searches the project root
- * for a single executable binary. If more than one is found, the user must
- * provide its name explicitly.
- */
-static bool verbose = false;
-static bool pmpath = false;
-static bool build = false;
-static bool args = false;
 
-static bool is_pm_project(const char *root) {
-  char marker[1024];
+static char *path;
 
-  if (snprintf(marker, sizeof(marker), "%s/.pm", root) >= (int)sizeof(marker))
-    return false;
+//\\// ----------------------------------------------------------------//\\//
+static bool verbose = false; // Print the process                  // -v
+static bool pmpath = false;  // Accept the path of the pm project // -p
+static bool build = false;   // Build before running              // -b
+static bool args = false;    // Pass the arguments after -a       // -a
+//\\// ----------------------------------------------------------------//\\//
 
-  return access(marker, F_OK) == 0;
-}
-
-/* Check the ELF magic number so object files and text scripts are ignored. */
-static bool is_elf_executable(const char *file) {
-  static const unsigned char elf_magic[] = {0x7f, 'E', 'L', 'F'};
-  unsigned char magic[sizeof(elf_magic)];
+// Check if a path is a regular file with execution permission
+bool is_executable(const char *file) {
   struct stat info;
+  unsigned char magic[4];
 
-  if (stat(file, &info) != 0 || !S_ISREG(info.st_mode) ||
-      access(file, X_OK) != 0)
+  if (stat(file, &info) == -1)
     return false;
 
-  FILE *stream = fopen(file, "rb");
-  if (!stream)
+  if (!S_ISREG(info.st_mode) ||
+      !(info.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)))
     return false;
 
-  size_t read = fread(magic, 1, sizeof(magic), stream);
-  fclose(stream);
+  FILE *f = fopen(file, "rb");
+  if (!f)
+    return false;
 
-  return read == sizeof(magic) &&
-         memcmp(magic, elf_magic, sizeof(elf_magic)) == 0;
+  size_t bytes = fread(magic, 1, sizeof(magic), f);
+  fclose(f);
+
+  return bytes == sizeof(magic) && magic[0] == 0x7f &&
+         magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F';
 }
 
-static int make_executable_path(char *result, size_t size, const char *root,
-                                const char *name) {
-  if (strchr(name, '/')) {
-    if (name[0] == '/')
-      return snprintf(result, size, "%s", name) < (int)size ? EXIT_SUCCESS
-                                                            : EXIT_FAILURE;
-    return snprintf(result, size, "%s/%s", root, name) < (int)size
-               ? EXIT_SUCCESS
-               : EXIT_FAILURE;
-  }
-
-  return snprintf(result, size, "%s/%s", root, name) < (int)size
-             ? EXIT_SUCCESS
-             : EXIT_FAILURE;
-}
-
-/* Find exactly one executable ELF file in the root of the project. */
-static int find_executable(const char *root, char *result, size_t size) {
-  DIR *directory = opendir(root);
-  struct dirent *entry;
-  int matches = 0;
-
-  if (!directory) {
-    ERROR("Could not open project path '%s': %s", root, strerror(errno));
+// Find the first executable in the project root
+int find_executable(char *executable, size_t size) {
+  DIR *dir = opendir(path);
+  if (!dir) {
+    ERROR("Could not open the path '%s': %s", path, strerror(errno));
     return EXIT_FAILURE;
   }
 
-  while ((entry = readdir(directory))) {
-    char candidate[1024];
-
-    if (entry->d_name[0] == '.')
-      continue;
-    if (make_executable_path(candidate, sizeof(candidate), root,
-                             entry->d_name) != EXIT_SUCCESS)
-      continue;
-    if (!is_elf_executable(candidate))
+  struct dirent *file;
+  while ((file = readdir(dir))) {
+    if (file->d_name[0] == '.')
       continue;
 
-    matches++;
-    if (matches == 1)
-      snprintf(result, size, "%s", candidate);
+    snprintf(executable, size, "%s/%s", path, file->d_name);
+    if (is_executable(executable)) {
+      closedir(dir);
+      return EXIT_SUCCESS;
+    }
   }
 
-  closedir(directory);
-
-  if (matches == 0) {
-    ERROR("No executable binary was found in '%s'; build the project first",
-          root);
-    return EXIT_FAILURE;
-  }
-  if (matches > 1) {
-    ERROR("More than one executable was found in '%s'; provide its name", root);
-    return EXIT_FAILURE;
-  }
-
-  return EXIT_SUCCESS;
+  closedir(dir);
+  ERROR("Could not find an executable in '%s'", path);
+  return EXIT_FAILURE;
 }
 
-static int execute_project(const char *executable, int argument_count,
-                           char **arguments) {
-  char **command = calloc((size_t)argument_count + 2, sizeof(*command));
-
-  if (!command) {
-    ERROR("Could not allocate the executable argument list");
-    return EXIT_FAILURE;
-  }
-
-  command[0] = (char *)executable;
-  for (int i = 0; i < argument_count; i++)
-    command[i + 1] = arguments[i];
-  command[argument_count + 1] = NULL;
-
-  int status = cmd_run(command, __FILE__, __LINE__, __func__);
-  free(command);
-  return status;
-}
-
-int pm_run(int argc, char **argv) {
-  const char *root = ".";
-  const char *name = NULL;
-  char **program_args = NULL;
-  int program_argc = 0;
+// Verify the project and execute its binary
+int run_project(const char *name, int argc, char **argv) {
+  char pmpath_file[1024];
   char executable[1024];
 
-  verbose = false;
-  pmpath = false;
-  build = false;
-  args = false;
+  snprintf(pmpath_file, sizeof(pmpath_file), "%s/.pm", path);
 
-  /*
-   * Parse only pm arguments before -a. Program arguments may themselves begin
-   * with '-', so they must not be interpreted as pm flags.
-   */
-  for (int i = 0; i < argc; i++) {
-    if (strcmp(argv[i], "-a") == 0) {
-      args = true;
-      program_args = argv + i + 1;
-      program_argc = argc - i - 1;
-      break;
-    }
-    if (strcmp(argv[i], "-p") == 0) {
-      pmpath = true;
-      if (++i >= argc) {
-        ERROR("The -p flag requires a project path");
-        return EXIT_FAILURE;
-      }
-      root = argv[i];
-      continue;
-    }
-    if (is_flag(argv[i])) {
-      bool valid = true;
-
-      /* -v and -b may be grouped as -vb, matching the rest of pm. */
-      for (int j = 1; argv[i][j] != '\0'; j++) {
-        if (argv[i][j] == 'v')
-          verbose = true;
-        else if (argv[i][j] == 'b')
-          build = true;
-        else
-          valid = false;
-      }
-
-      if (!valid)
-        WARN("Unrecognized run flag '%s'", argv[i]);
-      continue;
-    }
-    if (name) {
-      ERROR("Unexpected run argument '%s'; use -a before program arguments",
-            argv[i]);
-      return EXIT_FAILURE;
-    }
-    name = argv[i];
-  }
-
-  if (!is_pm_project(root)) {
-    ERROR("The path '%s' is not a pm project", root);
+  FILE *f = fopen(pmpath_file, "r");
+  if (!f) {
+    ERROR("The path '%s' is not a pm project", path);
     return EXIT_FAILURE;
   }
-
-  if (build && build_project(root, verbose) != EXIT_SUCCESS)
-    return EXIT_FAILURE;
+  fclose(f);
 
   if (name) {
-    if (make_executable_path(executable, sizeof(executable), root, name) !=
-        EXIT_SUCCESS) {
-      ERROR("Executable path is too long");
-      return EXIT_FAILURE;
-    }
-    if (!is_elf_executable(executable)) {
-      ERROR("'%s' is not an executable binary", executable);
-      return EXIT_FAILURE;
-    }
-  } else if (find_executable(root, executable, sizeof(executable)) !=
-             EXIT_SUCCESS) {
+    if (name[0] == '/')
+      snprintf(executable, sizeof(executable), "%s", name);
+    else
+      snprintf(executable, sizeof(executable), "%s/%s", path, name);
+  } else if (find_executable(executable, sizeof(executable)) == EXIT_FAILURE) {
     return EXIT_FAILURE;
   }
 
-  if (verbose) {
-    INFO("Project path: '%s'", root);
-    INFO("Executable: '%s'", executable);
-    INFO("Program arguments: %d", args ? program_argc : 0);
+  if (!is_executable(executable)) {
+    ERROR("The file '%s' is not an executable binary", executable);
+    return EXIT_FAILURE;
   }
 
-  return execute_project(executable, program_argc, program_args);
+  if (verbose)
+    INFO("Running '%s'", executable);
+
+  // argv has enough space for the executable, its arguments and NULL.
+  char *command[argc + 2];
+  command[0] = executable;
+
+  for (int i = 0; i < argc; i++) {
+    command[i + 1] = argv[i];
+  }
+  command[argc + 1] = NULL;
+
+  return cmd_run(command, __FILE__, __LINE__, __func__);
+}
+
+// Verify flags and execute the project
+int pm_run(int argc, char **argv) {
+  char *name = NULL;
+  char **program_args = NULL;
+  int program_argc = 0;
+
+  get_flags(argc, argv);
+
+  if (has_flag('v')) {
+    verbose = true;
+  }
+  if (has_flag('p')) {
+    pmpath = true;
+    path = argv[argc - 1];
+  } else {
+    path = ".";
+  }
+  if (has_flag('b')) {
+    build = true;
+  }
+  if (has_flag('a')) {
+    args = true;
+  }
+
+  const char *flags = "pvba";
+  warn_invalid_flags(strlen(flags), flags);
+
+  if (pmpath && is_flag(path)) {
+    ERROR("The -p flag needs a project path");
+    return EXIT_FAILURE;
+  }
+
+  // The first normal argument is the executable name.
+  for (int i = 0; i < argc; i++) {
+    if (pmpath && i == argc - 1)
+      continue;
+
+    if (strcmp(argv[i], "-a") == 0) {
+      program_args = argv + i + 1;
+      program_argc = argc - i - 1;
+
+      // With -p, both "-p" and its final path belong to pm.
+      if (pmpath)
+        program_argc -= 2;
+      break;
+    }
+
+    if (!is_flag(argv[i]) && !name)
+      name = argv[i];
+  }
+
+  if (build && build_project(path) == EXIT_FAILURE)
+    return EXIT_FAILURE;
+
+  if (!args) {
+    program_args = NULL;
+    program_argc = 0;
+  }
+
+  return run_project(name, program_argc, program_args);
 }
