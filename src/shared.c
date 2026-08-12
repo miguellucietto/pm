@@ -77,6 +77,24 @@ char *get_arg(int argc, char** argv, int i) {
   return argv[i];
 }
 
+char *get_flag_value(int argc, char **argv, char flag) {
+  char option[3] = {'-', flag, '\0'};
+
+  for (int i = 0; i < argc - 1; i++) {
+    if (strcmp(argv[i], option) == 0 && !is_flag(argv[i + 1]))
+      return argv[i + 1];
+  }
+  return NULL;
+}
+
+char *get_last_arg(int argc, char **argv) {
+  for (int i = argc - 1; i >= 0; i--) {
+    if (!is_flag(argv[i]))
+      return argv[i];
+  }
+  return NULL;
+}
+
 
 /* One entry for every possible unsigned-char flag name. */
 bool Flags[256] = {false};

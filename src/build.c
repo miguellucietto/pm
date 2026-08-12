@@ -5,10 +5,10 @@
 #include <log.h>
 
 #include "build.h"
+#include "config.h"
 #include "shared.h"
 
-
-static char *path;
+static char path[PM_PATH_SIZE];
 
 //\\// ----------------------------------------------------------------//\\//
 static bool pmpath = false; // Accept the path of the pm project // -p
@@ -17,20 +17,10 @@ static bool verbose = false; // Print the process                // -v
 
 // Verify the project and call its Makefile
 int build_project(const char *root) {
-  char pmpath_file[1024];
-  char makefile[1024];
-
-  snprintf(pmpath_file, sizeof(pmpath_file), "%s/.pm", root);
+  char makefile[PM_PATH_SIZE];
   snprintf(makefile, sizeof(makefile), "%s/Makefile", root);
 
-  FILE *f = fopen(pmpath_file, "r");
-  if (!f) {
-    ERROR("The path '%s' is not a pm project", root);
-    return EXIT_FAILURE;
-  }
-  fclose(f);
-
-  f = fopen(makefile, "r");
+  FILE *f = fopen(makefile, "r");
   if (!f) {
     ERROR("Could not find the Makefile in '%s'", root);
     return EXIT_FAILURE;
@@ -45,14 +35,11 @@ int build_project(const char *root) {
 
 // Verify flags and build the project
 int pm_build(int argc, char **argv) {
+  char *project;
+
   get_flags(argc, argv);
 
-  if (has_flag('p')) {
-    pmpath = true;
-    path = argv[argc - 1];
-  } else {
-    path = ".";
-  }
+  pmpath = has_flag('p');
   if (has_flag('v')) {
     verbose = true;
   }
@@ -60,8 +47,16 @@ int pm_build(int argc, char **argv) {
   const char *flags = "pv";
   warn_invalid_flags(strlen(flags), flags);
 
-  if (pmpath && is_flag(path)) {
-    ERROR("The -p flag needs a project path");
+  project = get_flag_value(argc, argv, 'p');
+  if (pmpath && !project) {
+    ERROR("The -p flag needs a project name");
+    return EXIT_FAILURE;
+  }
+
+  if (project) {
+    if (resolve_project(project, path, sizeof(path)) == EXIT_FAILURE)
+      return EXIT_FAILURE;
+  } else if (current_project(path, sizeof(path)) == EXIT_FAILURE) {
     return EXIT_FAILURE;
   }
 

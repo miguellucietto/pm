@@ -1,5 +1,3 @@
-#include <fenv.h>
-#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,139 +5,92 @@
 #include <log.h>
 
 #include "add.h"
+#include "config.h"
 #include "shared.h"
 
+static char path[PM_PATH_SIZE];
+static bool pmpath = false; // Select a registered project // -p
+static bool verbose = false; // Print the process           // -v
+static bool force = false;   // Add files in current path   // -f
+static bool noc = false;     // Do not create .c            // -h
+static bool noh = false;     // Do not create .h            // -c
 
-static char *path;
-/* Flags accepted by `pm add`. */
-//\\// ----------------------------------------------------------------//\\//
-static bool pmpath = false; // Accept the path of the pm project // -p
-static bool verbose = false; // Print the process               // -v
-static bool force = false;   // Add file anywhere              // -f
-static bool noc = false; // No .c file                        // -h
-static bool noh = false; // No .h file                       // -c
-//\\// ----------------------------------------------------------------//\\//
-
-/* Create the source/header pair requested by the active flags. */
 int add_file(const char *name) {
+  char fileh[PM_PATH_SIZE * 2], filec[PM_PATH_SIZE * 2];
+  FILE *f;
+
   if (!name) {
     ERROR("Provide a name to add");
     return EXIT_FAILURE;
   }
 
-  FILE *f;
+  snprintf(fileh, sizeof(fileh), "%s/include/%s.h", path, name);
+  snprintf(filec, sizeof(filec), "%s/src/%s.c", path, name);
 
-  // Verifying .pm
-  if (!force) {
-    if (pmpath) {
-      char opath[strlen(path) + 10];
-      
-      snprintf(opath, sizeof(opath), "%s/.pm", path);
-      f = fopen(opath, "r");
-      if (!f) {
-	ERROR("The path '%s' is not a pm project", path);
-	return EXIT_FAILURE;
-      }
-    } else {
-      f = fopen(".pm", "r");
-      if (!f) {
-	ERROR("The command has to be used in a pm project");
-	return EXIT_FAILURE;
-      }
+  if (verbose) INFO("Creating module '%s' in project", name);
+
+  if (!noc) {
+    f = fopen(filec, "w");
+    if (!f) {
+      ERROR("Could not create source file for '%s'", name);
+      return EXIT_FAILURE;
     }
-    fclose(f);    
+    fprintf(f, "#include \"%s.h\"", name);
+    fclose(f);
   }
-  
 
-    // Making paths      ↓
-    if (verbose) puts("Making paths...");    
-    size_t s = strlen(name) + 1000;
-    char fileh[s], filec[s];
-
-    // Creating include path
-    if (pmpath) {
-      snprintf(fileh, sizeof(fileh), "%s/include/%s.h", path, name);
-    } else {
-      snprintf(fileh, sizeof(fileh), "include/%s.h", name);
+  if (!noh) {
+    f = fopen(fileh, "w");
+    if (!f) {
+      ERROR("Could not create header file for '%s'", name);
+      return EXIT_FAILURE;
     }
-    if (verbose) printf("Path %s made\n", fileh);
+    fprintf(f, "#ifndef %s_H_\n#define %s_H_\n\n#endif /* %s_H_ */\n",
+            name, name, name);
+    fclose(f);
+  }
 
-
-    // Creating source path
-    if (pmpath) {
-      snprintf(filec, sizeof(filec), "%s/src/%s.c", path, name);
-    } else {
-      snprintf(filec, sizeof(filec), "src/%s.c", name);
-    }
-    if (verbose) printf("Path %s made\n", filec);
-    
-
-    if (verbose) puts("Creating files...");
-    // Creating source file
-    if (!noc) {
-      f = fopen(filec, "w");
-      if (f) {
-	fprintf(f, "#include \"%s\"", fileh);
-	fclose(f);
-      } else {
-	ERROR("Could not create '%s'", filec);
-      }
-    }
-
-    // Creating header file
-    if (!noh) { 
-      f = fopen(fileh, "w");
-      if (f) {
-	fprintf(f, "#ifndef %s_H_\n#define %s_H_\n\n#endif /* %s_H_ */ \n", name, name, name);
-	fclose(f);
-      } else {
-	ERROR("Could not create '%s'", fileh);
-      }
-    }
-    
-    if (verbose) puts("Finished process!");
-    return EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
-
-/* Parse `pm add` flags and create every non-flag file name. */
 int pm_add(int argc, char **argv) {
+  char *project;
+
   get_flags(argc, argv);
-  if (has_flag('p')) {
-    pmpath = true;
-    path = argv[argc - 1];
-  }
-  if (has_flag('v')) {
-    verbose = true;
-  }
-  if (has_flag('h')) {
-    noh = true;
-  }
-  if (has_flag('c')) {
-    noc = true;
-  }
-  if (has_flag('f')) {
-    force = true;
+  pmpath = has_flag('p');
+  verbose = has_flag('v');
+  force = has_flag('f');
+  noh = has_flag('h');
+  noc = has_flag('c');
+
+  const char *flags = "phcvf";
+  warn_invalid_flags(strlen(flags), flags);
+
+  project = get_flag_value(argc, argv, 'p');
+  if (pmpath && !project) {
+    ERROR("The -p flag needs a project name");
+    return EXIT_FAILURE;
   }
 
-  const char* flags = "phcvf";
-  warn_invalid_flags(strlen(flags), flags);
-  
+  if (project) {
+    if (resolve_project(project, path, sizeof(path)) == EXIT_FAILURE)
+      return EXIT_FAILURE;
+  } else if (force) {
+    snprintf(path, sizeof(path), ".");
+  } else if (current_project(path, sizeof(path)) == EXIT_FAILURE) {
+    return EXIT_FAILURE;
+  }
+
   if (noh && noc) {
-    if (verbose)
-      printf("-c and -h?\nBRUUUUUUUHHHHHH\n\n");
+    WARN("Flags -c and -h disable both files");
     return EXIT_SUCCESS;
   }
 
   for (int i = 0; i < argc; i++) {
-    if (verbose) printf("argv[%d] = %s\n", i, argv[i]);
-    
-    if (pmpath && i == argc - 1)
+    if (i > 0 && strcmp(argv[i - 1], "-p") == 0)
       continue;
-    
-    if (!is_flag(argv[i]) && add_file(argv[i]) == EXIT_FAILURE) {
+    if (!is_flag(argv[i]) && add_file(argv[i]) == EXIT_FAILURE)
       return EXIT_FAILURE;
-    }
   }
   return EXIT_SUCCESS;
 }

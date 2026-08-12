@@ -43,6 +43,12 @@ void warn_invalid_flags(int flagc, const char* flags);
 /* Safely retrieve argv[i]; returns NULL when i is outside the argument list. */
 char *get_arg(int argc, char **argv, int i);
 
+/* Return the argument immediately after a standalone flag such as -p. */
+char *get_flag_value(int argc, char **argv, char flag);
+
+/* Return the final non-flag argument. */
+char *get_last_arg(int argc, char **argv);
+
 /* Allocate a copy of text; the caller must release it with free(). */
 char* strdup(const char*);
 

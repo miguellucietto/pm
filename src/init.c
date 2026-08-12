@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE 700
+
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -7,13 +9,13 @@
 #include <sys/stat.h>
 #include <log.h>
 
+#include "config.h"
 #include "init.h"
 #include "shared.h"
 
 static char* path;
 
 /* Flags accepted by `pm init`. */
-static bool pmpath = false; // Accept the path of the directory to create the project  -p | path
 static bool no_default_files = false; // Cancel the default files                      -d | default files
 static bool no_make = false; // Cancel the Makefile                                    -M | Makefile
 static bool no_cland = false; // Cancel the .clangd                                    -c | .clangd
@@ -31,12 +33,12 @@ int make_path(char *p, size_t size, const char* r, const char* t) {
   const char *root = r ? r : ".";
 
   if (verbose)
-    printf("Making path '%s/%s'\n", root, t);
+    INFO("Making path '%s/%s'", root, t);
 
   // Making path
   snprintf(p, size, "%s/%s", root, t);
 
-  if (verbose) puts("done");
+  if (verbose) INFO("Path created");
   
   return EXIT_SUCCESS;
 }
@@ -53,7 +55,7 @@ int write_file(const char* p, const char* content) {
   }
 
   // Opening the file
-  if (verbose) printf("Opening file '%s'\n", p);
+  if (verbose) INFO("Opening file '%s'", p);
   
   FILE *f = fopen(p, "w");
   if (!f) {
@@ -62,7 +64,7 @@ int write_file(const char* p, const char* content) {
   }
 
   // Writing the content in the file
-  if (verbose) printf("Writing default content in file '%s'\n", p);
+  if (verbose) INFO("Writing default content in file '%s'", p);
 
   fputs(content, f);
   
@@ -86,7 +88,9 @@ int write_default_files(const char* r) {
   } while (0)
 
   if (!no_default_files) {
-    if (verbose) printf("Making default files: %s | %s | %s\n", no_make ? "" : "Makefile", no_cland ? "" : ".clangd", no_main ? "" : "main.c");
+    if (verbose)
+      INFO("Making default files: %s | %s | %s", no_make ? "" : "Makefile",
+           no_cland ? "" : ".clangd", no_main ? "" : "main.c");
     if (!no_make)  W("Makefile", DEFAULT_MAKEFILE);
     if (!no_cland) W(".clangd", DEFAULT_CLANGD);
     if (!no_main)  W("src/main.c", DEFAULT_MAIN_C);
@@ -108,7 +112,7 @@ int init(char* r){
   } else return EXIT_FAILURE;
   
   // Creating directory
- if (verbose) puts("Creating directory...");
+  if (verbose) INFO("Creating directory");
   if (mkdir(root, 0777) && errno != EEXIST) {
     ERROR("Could not create project root '%s': %s", root, strerror(errno));
       return EXIT_FAILURE;
@@ -121,9 +125,9 @@ int init(char* r){
       return EXIT_FAILURE;                                                               \
   } while (0)
 
-  // Making .pm path
-  if (verbose) puts("Creating .pm...");
-  
+  // .pm stores only settings that belong to this project.
+  if (verbose) INFO("Creating project configuration");
+
   if (snprintf(p, sizeof(p), "%s/.pm", root) >= (int)sizeof(p)) {
     ERROR("Project marker path is too long");
     return EXIT_FAILURE;
@@ -133,17 +137,29 @@ int init(char* r){
     ERROR("Could not create project marker '%s': %s", p, strerror(errno));
     return EXIT_FAILURE;
   }
-  fprintf(f, "%s\nThis file is necessary for some pm commands, pls, keep it here", root);
+  fputs("target=a\n", f);
   fclose(f);
 
 
   // Making path and dirs
-  if (verbose) puts("Making default dirs...");
+  if (verbose) INFO("Making default directories");
   Mkdir("src");
   Mkdir("include");
   Mkdir("build");
   
-  return write_default_files(root);
+  if (write_default_files(root) == EXIT_FAILURE)
+    return EXIT_FAILURE;
+
+  char absolute[PM_PATH_SIZE];
+  if (!realpath(root, absolute)) {
+    ERROR("Could not resolve project path '%s': %s", root, strerror(errno));
+    return EXIT_FAILURE;
+  }
+  if (register_project(r, absolute) == EXIT_FAILURE)
+    return EXIT_FAILURE;
+
+  if (verbose) INFO("Registered project '%s'", r);
+  return EXIT_SUCCESS;
 }
 
 
@@ -162,21 +178,14 @@ int pm_init(int argc, char** argv) {
   if (has_flag('d')) {
     no_default_files = true;
   }
-  if (has_flag('p')) {
-    pmpath = true;
-    path = argv[argc - 1];
-  } else {
-    path = ".";
-  }
+  path = ".";
   if (has_flag('v')) {
     verbose = true;
   }
-
+  const char *flags = "cmMdv";
+  warn_invalid_flags(strlen(flags), flags);
 
   for (int i = 0; i < argc; i++) {
-    if (pmpath && i == argc - 1)
-      continue;
-        
     if (!is_flag(argv[i]) && init(argv[i]) == EXIT_FAILURE)
       return EXIT_FAILURE;
   }

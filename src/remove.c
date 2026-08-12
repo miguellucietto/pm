@@ -1,120 +1,79 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <log.h>
 
+#include "config.h"
 #include "remove.h"
 #include "shared.h"
 
+static char path[PM_PATH_SIZE];
+static bool force = false;   // Ignore missing files        // -f
+static bool pmpath = false;  // Select a registered project // -p
+static bool verbose = false; // Print the process           // -v
+static bool noc = false;     // Do not remove source        // -c
+static bool noh = false;     // Do not remove header        // -h
 
-static char* path;
-/* Flags accepted by `pm rm`. */
-//\\// ----------------------------------------------------------------//\\//
-static bool force = false; // Force the deletion of the files               // -f
-static bool pmpath = false; // Accept the path of the pm project           // -p
-static bool verbose = false; // Print the process                         // -v
-static bool noc = false; // Don't remove the source file                 // -c
-static bool noh = false; // Don't remove the header file                // -h
-//\\// ----------------------------------------------------------------//\\//
+static int remove_one(const char *file) {
+  if (remove(file) == 0)
+    return EXIT_SUCCESS;
+  if (force)
+    return EXIT_SUCCESS;
+  ERROR("Could not remove '%s'", file);
+  return EXIT_FAILURE;
+}
 
+int remove_file(const char *file) {
+  char fh[PM_PATH_SIZE * 2], fc[PM_PATH_SIZE * 2];
 
-/* Remove the source/header pair requested by the active flags. */
-int remove_file(const char* file) {
   if (!file) {
     ERROR("Provide a name to remove");
     return EXIT_FAILURE;
   }
 
-  FILE *f;
-  // Verifying pm project
-  if (verbose) puts("Verifying pm project...");
-  if (pmpath) {
-    char opath[1024];
-    snprintf(opath, sizeof(opath), "%s/.pm", path);
+  snprintf(fh, sizeof(fh), "%s/include/%s.h", path, file);
+  snprintf(fc, sizeof(fc), "%s/src/%s.c", path, file);
 
-    f = fopen(opath, "r");
-    if (!f) {
-      ERROR("The path '%s' is not a pm project", path);
-      return EXIT_FAILURE;
-    }
-  } else {
-    f = fopen(".pm", "r");
-    if (!f) {
-      ERROR("The command needs a pm project");
-      return EXIT_FAILURE;
-    }
-  }
-  fclose(f);
+  if (verbose) INFO("Removing module '%s' from project", file);
 
-  
-  size_t s = strlen(file) + 1000;
-  char fh[s], fc[s];
-
-  // Making paths
-  if (verbose) puts("Making paths...");
-  if (pmpath) {
-    snprintf(fh, s, "%s/include/%s.c", path, file);
-    if (verbose) printf("Created path '%s'", fh);
-    
-    snprintf(fc, s, "%s/src/%s.h", path, file);
-    if (verbose) printf("Created path '%s'", fc);
-    
-  } else {
-    snprintf(fh, s, "include/%s.h", file);
-    if (verbose) printf("Created path '%s'", fh);
-    
-    snprintf(fc, s, "src/%s.c", file);
-    if (verbose) printf("Created path '%s'", fc);
-  }
-
-
-  // Removing files
-  if (verbose) puts("Removing files...");
-  if (!noc) {
-    CMDF("rm %s %s", force ? "-rf" : "", fc);
-    if (verbose) printf("file '%s removed'", fc);
-  }
-  if (!noh) {
-    CMDF("rm %s %s", force ? "-rf" : "", fh);
-    if (verbose) printf("file '%s removed'", fh);
-  }
-
-  if (verbose) puts("Finished process!");
-
+  if (!noc && remove_one(fc) == EXIT_FAILURE)
+    return EXIT_FAILURE;
+  if (!noh && remove_one(fh) == EXIT_FAILURE)
+    return EXIT_FAILURE;
   return EXIT_SUCCESS;
 }
 
+int pm_remove(int argc, char **argv) {
+  char *project;
 
-/* Parse `pm rm` flags and remove every non-flag file name. */
-int pm_remove(int argc, char** argv) {
   get_flags(argc, argv);
-  if (has_flag('c')) {
-    noc = true;
-  }
-  if (has_flag('h')) {
-    noh = true;
-  }
-  if (has_flag('f')) {
-    force = true;
-  }
-  if (has_flag('p')) {
-    pmpath = true;
-    path = argv[argc - 1];
-  }
-  if (has_flag('v')) {
-    verbose = true;
-  }
+  noc = has_flag('c');
+  noh = has_flag('h');
+  force = has_flag('f');
+  pmpath = has_flag('p');
+  verbose = has_flag('v');
 
   const char *flags = "chfpv";
   warn_invalid_flags(strlen(flags), flags);
 
-  for (int i = 0; i < argc; i++) {
-    if (pmpath && i == argc - 1) 
-	continue;
-      
-    if (!is_flag(argv[i]) && remove_file((const char *)argv[i]) == EXIT_FAILURE) {
+  project = get_flag_value(argc, argv, 'p');
+  if (pmpath && !project) {
+    ERROR("The -p flag needs a project name");
+    return EXIT_FAILURE;
+  }
+  if (project) {
+    if (resolve_project(project, path, sizeof(path)) == EXIT_FAILURE)
       return EXIT_FAILURE;
-    }
+  } else if (current_project(path, sizeof(path)) == EXIT_FAILURE) {
+    return EXIT_FAILURE;
+  }
+
+  for (int i = 0; i < argc; i++) {
+    if (i > 0 && strcmp(argv[i - 1], "-p") == 0)
+      continue;
+    if (!is_flag(argv[i]) && remove_file(argv[i]) == EXIT_FAILURE)
+      return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 }

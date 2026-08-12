@@ -8,11 +8,11 @@
 #include <log.h>
 
 #include "build.h"
+#include "config.h"
 #include "run.h"
 #include "shared.h"
 
-
-static char *path;
+static char path[PM_PATH_SIZE];
 
 //\\// ----------------------------------------------------------------//\\//
 static bool verbose = false; // Print the process                  // -v
@@ -71,34 +71,31 @@ int find_executable(char *executable, size_t size) {
 
 // Verify the project and execute its binary
 int run_project(const char *name, int argc, char **argv) {
-  char pmpath_file[1024];
-  char executable[1024];
-
-  snprintf(pmpath_file, sizeof(pmpath_file), "%s/.pm", path);
-
-  FILE *f = fopen(pmpath_file, "r");
-  if (!f) {
-    ERROR("The path '%s' is not a pm project", path);
-    return EXIT_FAILURE;
-  }
-  fclose(f);
+  char executable[PM_PATH_SIZE * 2];
+  char target[1024];
 
   if (name) {
     if (name[0] == '/')
       snprintf(executable, sizeof(executable), "%s", name);
     else
       snprintf(executable, sizeof(executable), "%s/%s", path, name);
-  } else if (find_executable(executable, sizeof(executable)) == EXIT_FAILURE) {
-    return EXIT_FAILURE;
+  } else {
+    read_project_target(path, target, sizeof(target));
+    snprintf(executable, sizeof(executable), "%s/%s", path, target);
+
+    // Old projects may not have a target configured yet.
+    if (!is_executable(executable) &&
+        find_executable(executable, sizeof(executable)) == EXIT_FAILURE)
+      return EXIT_FAILURE;
   }
 
   if (!is_executable(executable)) {
-    ERROR("The file '%s' is not an executable binary", executable);
+    ERROR("The selected target is not an executable binary");
     return EXIT_FAILURE;
   }
 
   if (verbose)
-    INFO("Running '%s'", executable);
+    INFO("Running project executable");
 
   // argv has enough space for the executable, its arguments and NULL.
   char *command[argc + 2];
@@ -117,6 +114,7 @@ int pm_run(int argc, char **argv) {
   char *name = NULL;
   char **program_args = NULL;
   int program_argc = 0;
+  char *project;
 
   get_flags(argc, argv);
 
@@ -125,9 +123,6 @@ int pm_run(int argc, char **argv) {
   }
   if (has_flag('p')) {
     pmpath = true;
-    path = argv[argc - 1];
-  } else {
-    path = ".";
   }
   if (has_flag('b')) {
     build = true;
@@ -139,23 +134,28 @@ int pm_run(int argc, char **argv) {
   const char *flags = "pvba";
   warn_invalid_flags(strlen(flags), flags);
 
-  if (pmpath && is_flag(path)) {
-    ERROR("The -p flag needs a project path");
+  project = get_flag_value(argc, argv, 'p');
+  if (pmpath && !project) {
+    ERROR("The -p flag needs a project name");
+    return EXIT_FAILURE;
+  }
+
+  if (project) {
+    if (resolve_project(project, path, sizeof(path)) == EXIT_FAILURE)
+      return EXIT_FAILURE;
+  } else if (current_project(path, sizeof(path)) == EXIT_FAILURE) {
     return EXIT_FAILURE;
   }
 
   // The first normal argument is the executable name.
   for (int i = 0; i < argc; i++) {
-    if (pmpath && i == argc - 1)
+    if (i > 0 && strcmp(argv[i - 1], "-p") == 0)
       continue;
 
     if (strcmp(argv[i], "-a") == 0) {
       program_args = argv + i + 1;
       program_argc = argc - i - 1;
 
-      // With -p, both "-p" and its final path belong to pm.
-      if (pmpath)
-        program_argc -= 2;
       break;
     }
 

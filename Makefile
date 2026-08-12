@@ -11,15 +11,13 @@ DEPS = $(OBJECTS:.o=.d)
 
 TARGET = pm
 
+all: $(TARGET)
 
 dev: all
 	@sudo install -Dm755 ./$(TARGET) /usr/local/bin/pm
 
 undev:
 	@sudo rm -f /usr/local/bin/pm
-
-
-all: $(TARGET) 
 
 
 $(TARGET): $(OBJECTS)
@@ -35,6 +33,8 @@ clean:
 	@rm -rf $(BUILD_DIR) $(TARGET) compile_commands.json
 
 bear:
-	@bear -- $(MAKE)
+	@bear -- $(MAKE) -B all
 
 -include $(DEPS)
+
+.PHONY: all dev undev clean bear
