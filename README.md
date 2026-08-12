@@ -82,6 +82,7 @@ pm config -p <project>
 pm config -p <project> -t <target>
 pm config -a <name> <path>
 pm config -r <project>
+pm config -s
 ```
 
 - No flags: list every `name=path` registration.
@@ -89,6 +90,64 @@ pm config -r <project>
 - `-t`: update the selected project's target.
 - `-a`: register an existing directory under a name.
 - `-r`: remove the global registration without deleting the project.
+- `-s`: install the Bash integration needed by `pm goto` in `~/.bashrc`.
+
+### List projects
+
+```sh
+pm list
+pm list -t
+```
+
+- Without flags: show the name and full path of every registered project.
+- `-t`: also show the target configured in each project's `.pm` file.
+- Registrations whose directories no longer exist are marked as `[missing]`.
+
+### Go to a project
+
+Programs cannot directly change the directory of the shell that started them.
+`pm goto` therefore validates the project and prints its absolute path:
+
+```sh
+pm goto <project>
+```
+
+To install the wrapper that makes `pm goto` change the current terminal
+directory, run:
+
+```sh
+pm config -s
+```
+
+The command adds this block to `~/.bashrc` only when it is not already present:
+
+```sh
+pm() {
+    if [ "$1" = "goto" ]; then
+        local directory
+        directory="$(command pm goto "${@:2}")" || return
+        cd "$directory" || return
+    else
+        command pm "$@"
+    fi
+}
+```
+
+Reload the shell configuration:
+
+```sh
+source ~/.bashrc
+```
+
+Then use:
+
+```sh
+pm goto <project>
+```
+
+`goto` accepts no flags. It returns a warning when the project argument is
+missing, when the registration does not exist, or when its directory was
+deleted.
 
 ### Help and version
 

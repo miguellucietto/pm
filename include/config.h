@@ -11,6 +11,9 @@ int pm_config(int argc, char **argv);
 /* Create ~/.config/pm and its projects file when they do not exist. */
 int ensure_pm_config(void);
 
+/* Return the path of ~/.config/pm/projects. */
+int get_projects_file_path(char *path, size_t size);
+
 /* Register or update a project name with its absolute path. */
 int register_project(const char *name, const char *path);
 
@@ -26,5 +29,8 @@ int current_project(char *path, size_t size);
 /* Read or write the target stored in <project>/.pm. */
 int read_project_target(const char *path, char *target, size_t size);
 int write_project_target(const char *path, const char *target);
+
+/* Install the `pm goto` Bash wrapper in ~/.bashrc. */
+int install_shell_integration(void);
 
 #endif // CONFIG_H

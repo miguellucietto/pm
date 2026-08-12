@@ -25,6 +25,17 @@ static int config_paths(char *directory, char *projects) {
   return EXIT_SUCCESS;
 }
 
+int get_projects_file_path(char *path, size_t size) {
+  char directory[PM_PATH_SIZE], projects[PM_PATH_SIZE];
+
+  if (ensure_pm_config() == EXIT_FAILURE ||
+      config_paths(directory, projects) == EXIT_FAILURE)
+    return EXIT_FAILURE;
+
+  snprintf(path, size, "%s", projects);
+  return EXIT_SUCCESS;
+}
+
 int ensure_pm_config(void) {
   char directory[PM_PATH_SIZE], projects[PM_PATH_SIZE];
   char config_directory[PM_PATH_SIZE];
@@ -219,6 +230,57 @@ int write_project_target(const char *path, const char *target) {
   return EXIT_SUCCESS;
 }
 
+int install_shell_integration(void) {
+  const char *home = getenv("HOME");
+  const char *marker = "# pm shell integration";
+  char bashrc[PM_PATH_SIZE], line[2048];
+
+  if (!home || !home[0]) {
+    ERROR("The HOME environment variable is not defined");
+    return EXIT_FAILURE;
+  }
+
+  snprintf(bashrc, sizeof(bashrc), "%s/.bashrc", home);
+
+  /* Do not install the same function more than once. */
+  FILE *f = fopen(bashrc, "r");
+  if (f) {
+    while (fgets(line, sizeof(line), f)) {
+      if (strstr(line, marker)) {
+        fclose(f);
+        INFO("Shell integration is already installed");
+        printf("Restart your terminal or run: source ~/.bashrc\n");
+        return EXIT_SUCCESS;
+      }
+    }
+    fclose(f);
+  }
+
+  f = fopen(bashrc, "a");
+  if (!f) {
+    ERROR("Could not open '%s': %s", bashrc, strerror(errno));
+    return EXIT_FAILURE;
+  }
+
+  fputs("\n# pm shell integration\n"
+        "pm() {\n"
+        "    if [ \"$1\" = \"goto\" ]; then\n"
+        "        local directory\n"
+        "        directory=\"$(command pm goto \"${@:2}\")\" || return\n"
+        "        cd \"$directory\" || return\n"
+        "    else\n"
+        "        command pm \"$@\"\n"
+        "    fi\n"
+        "}\n"
+        "# end pm shell integration\n",
+        f);
+  fclose(f);
+
+  SUCCESS("Shell integration installed in '%s'", bashrc);
+  printf("Restart your terminal or run: source ~/.bashrc\n");
+  return EXIT_SUCCESS;
+}
+
 /* Print all registered projects. */
 static int list_projects(void) {
   char directory[PM_PATH_SIZE], projects[PM_PATH_SIZE], line[PM_PATH_SIZE * 2];
@@ -241,8 +303,16 @@ int pm_config(int argc, char **argv) {
   char *project, *new_target;
 
   get_flags(argc, argv);
-  const char *flags = "partv";
+  const char *flags = "partvs";
   warn_invalid_flags(strlen(flags), flags);
+
+  if (has_flag('s')) {
+    if (argc != 1 || strcmp(argv[0], "-s") != 0) {
+      ERROR("The -s flag cannot be combined with other options");
+      return EXIT_FAILURE;
+    }
+    return install_shell_integration();
+  }
 
   if (has_flag('a')) {
     char *name = get_flag_value(argc, argv, 'a');
